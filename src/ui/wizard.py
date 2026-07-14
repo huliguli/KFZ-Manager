@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QPushButton,
     QVBoxLayout,
+    QWidget,
     QWizard,
     QWizardPage,
 )
@@ -22,17 +23,42 @@ from modules.models import KRAFTSTOFF_LABELS, label_for
 from ui.dialogs import VehicleDialog
 
 
+def _page_header(title: str, subtitle: str) -> QWidget:
+    """Titel + Untertitel einer Wizard-Seite als app-gestylte Labels.
+
+    Bewusst NICHT ``QWizardPage.setTitle/setSubTitle``: diesen Kopfbereich
+    zeichnet der Plattform-Style mit der SYSTEM-Palette. Im Windows-Dunkelmodus
+    ist er dadurch dunkel, während das App-Stylesheet die Textfarbe des hellen
+    Themes erzwingt — Ergebnis: dunkelblauer Text auf dunkelgrauem Grund
+    (unlesbar). Eigene Labels folgen dem App-Theme in hell UND dunkel.
+    (Gleiche Klasse wie der QMessageBox-Dunkelmodus-Fehler aus v1.0.3.)
+    """
+    box = QWidget()
+    layout = QVBoxLayout(box)
+    layout.setContentsMargins(0, 0, 0, 6)
+    layout.setSpacing(2)
+    heading = QLabel(title)
+    heading.setObjectName("H2")
+    sub = QLabel(subtitle)
+    sub.setObjectName("Muted")
+    sub.setWordWrap(True)
+    layout.addWidget(heading)
+    layout.addWidget(sub)
+    return box
+
+
 class _VehiclePage(QWizardPage):
     """Collects a list of vehicles via the add dialog."""
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
-        self.setTitle("Fahrzeug anlegen")
-        self.setSubTitle("Lege ein Fahrzeug oder mehrere an — weitere sind "
-                         "später jederzeit möglich.")
         self.items: list = []
 
         layout = QVBoxLayout(self)
+        layout.addWidget(_page_header(
+            "Fahrzeug anlegen",
+            "Lege ein Fahrzeug oder mehrere an — weitere sind später "
+            "jederzeit möglich."))
         self.list = QListWidget()
         layout.addWidget(self.list, 1)
 
@@ -77,7 +103,9 @@ class FirstRunWizard(QWizard):
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Willkommen")
-        self.setWizardStyle(QWizard.WizardStyle.ModernStyle)
+        # ClassicStyle: zeichnet keinen Style-Header (siehe _page_header) —
+        # damit folgt der ganze Assistent dem App-Theme statt dem OS-Modus.
+        self.setWizardStyle(QWizard.WizardStyle.ClassicStyle)
         self.setMinimumSize(600, 500)
         self.setButtonText(QWizard.WizardButton.NextButton, "Weiter")
         self.setButtonText(QWizard.WizardButton.BackButton, "Zurück")
@@ -90,9 +118,9 @@ class FirstRunWizard(QWizard):
 
     def _intro(self) -> QWizardPage:
         page = QWizardPage()
-        page.setTitle("Willkommen beim KFZ-Manager")
-        page.setSubTitle("Dein Hub für alles rund ums Auto.")
         layout = QVBoxLayout(page)
+        layout.addWidget(_page_header("Willkommen beim KFZ-Manager",
+                                      "Dein Hub für alles rund ums Auto."))
         text = QLabel(
             "Der KFZ-Manager begleitet deine Fahrzeuge:\n\n"
             "  •  Tank- & Ladebuch mit Verbrauch und Kosten/km\n"

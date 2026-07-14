@@ -4,6 +4,15 @@ Alle nennenswerten Änderungen dieses Projekts. Das Format folgt
 [Keep a Changelog](https://keepachangelog.com/de/), die Versionierung
 [SemVer](https://semver.org/lang/de/).
 
+## [1.1.1] – 2026-07-14
+
+### Behoben
+- Der Einrichtungs-Assistent war im Windows-Dunkelmodus schlecht lesbar:
+  Überschrift und Untertitel standen dunkel auf dunkelgrauem Grund, weil
+  dieser Kopfbereich von Windows eingefärbt wurde und nicht vom Design der
+  App. Der Assistent folgt jetzt vollständig dem hellen bzw. dunklen
+  App-Design.
+
 ## [1.1.0] – 2026-07-14
 
 ### Hinzugefügt
