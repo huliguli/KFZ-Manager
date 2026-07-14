@@ -54,11 +54,20 @@ class AppContext(QObject):
         self.catalog = CatalogRepository(db)
         self.settings = SettingsRepository(db)
 
-        # Sister-app discovery once per session (fail-silent by contract).
+        # Sister-app discovery at startup; re-run periodically by the main
+        # window so a newly installed sister appears without a restart.
         self.sister = interop.discover_sister()
 
         self._current_vehicle: Vehicle | None = None
         self._restore_vehicle_selection()
+
+    def refresh_sister(self) -> bool:
+        """Re-run the family discovery; True when the state changed."""
+        new = interop.discover_sister()
+        changed = (new.status != self.sister.status
+                   or new.db_path != self.sister.db_path)
+        self.sister = new
+        return changed
 
     # -- vehicle selection ----------------------------------------------------
     def _restore_vehicle_selection(self) -> None:

@@ -4,6 +4,19 @@ Alle nennenswerten Änderungen dieses Projekts. Das Format folgt
 [Keep a Changelog](https://keepachangelog.com/de/), die Versionierung
 [SemVer](https://semver.org/lang/de/).
 
+## [1.1.0] – 2026-07-14
+
+### Hinzugefügt
+- Update-Prüfung läuft jetzt auch bei laufender App: einmal pro Stunde wird
+  im Hintergrund nach neuen Versionen gesucht (Start-Prüfung unverändert).
+  „Später“ im Update-Dialog gilt für die laufende Sitzung — dieselbe Version
+  wird nicht stündlich erneut angeboten.
+- Die App-Familie wird alle 5 Minuten neu erkannt: Wird der
+  HaushaltsManager installiert oder aktualisiert, während der KFZ-Manager
+  läuft, erscheint die Haushalts-Budget-Kachel ohne Neustart; neue Daten der
+  Schwester-App werden ebenfalls live übernommen.
+- Der Verbindungsstatus in den Einstellungen aktualisiert sich jetzt live.
+
 ## [1.0.0] – 2026-07-14
 
 Erstes Release.

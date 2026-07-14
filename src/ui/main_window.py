@@ -8,7 +8,7 @@ remembers its size/position between runs and exposes a light/dark toggle.
 
 from __future__ import annotations
 
-from PyQt6.QtCore import QSize, Qt
+from PyQt6.QtCore import QSize, Qt, QTimer
 from PyQt6.QtGui import QCloseEvent, QIcon, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QButtonGroup,
@@ -91,6 +91,7 @@ class MainWindow(QWidget):
 
         self._init_shortcuts()
         self._restore_geometry()
+        self._init_background_timers()
         self._reload_switcher()
         self._select(0)
 
@@ -266,6 +267,70 @@ class MainWindow(QWidget):
         for view in self._views:
             view.on_theme_changed()
 
+    # -- periodic background checks ------------------------------------------
+    # A long-running app must stay current without restarts: updates are
+    # re-checked hourly, the family folder every few minutes (so a newly
+    # installed/started sister app activates the budget card live).
+    UPDATE_CHECK_INTERVAL_MS = 60 * 60 * 1000
+    FAMILY_POLL_INTERVAL_MS = 5 * 60 * 1000
+
+    def _init_background_timers(self) -> None:
+        self._update_timer = QTimer(self)
+        self._update_timer.setInterval(self.UPDATE_CHECK_INTERVAL_MS)
+        self._update_timer.timeout.connect(self._periodic_update_check)
+        self._update_timer.start()
+
+        self._family_timer = QTimer(self)
+        self._family_timer.setInterval(self.FAMILY_POLL_INTERVAL_MS)
+        self._family_timer.timeout.connect(self._family_tick)
+        self._family_timer.start()
+        self._sister_db_mtime = self._current_sister_mtime()
+
+    def _periodic_update_check(self) -> None:
+        """Hourly re-check while the app runs (same rules as at startup).
+
+        Skips silently while a previous check, an update dialog or a download
+        is still active; versions the user postponed stay quiet for the
+        session (see EinstellungenView.session_dismissed).
+        """
+        if not self.ctx.config.get("update_check_enabled", True):
+            return
+        if self._update_checker is not None and self._update_checker.isRunning():
+            return
+        settings_view = self._views[-1]
+        if getattr(settings_view, "update_flow_active", lambda: False)():
+            return
+        self._update_checker = updater.UpdateChecker(GITHUB_REPO, APP_VERSION, parent=self)
+        self._update_checker.result.connect(self._on_startup_update)
+        self._update_checker.start()
+
+    def _current_sister_mtime(self) -> float | None:
+        """Last-modified stamp of the sister DB (None when not connected)."""
+        sister = self.ctx.sister
+        if sister.status == "aktiv" and sister.db_path is not None:
+            try:
+                return sister.db_path.stat().st_mtime
+            except OSError:
+                return None
+        return None
+
+    def _family_tick(self) -> None:
+        """Re-announce ourselves and pick up sister-app changes live.
+
+        Catches both cases without an app restart: the sister gets installed/
+        updated while we run (state change), or she writes new data that our
+        budget card shows (DB mtime change). Views are only refreshed when
+        something actually changed, so user interaction is never disturbed
+        by a needless rebuild.
+        """
+        from modules import interop
+        interop.announce_self(self.ctx.db.path)
+        changed = self.ctx.refresh_sister()
+        mtime = self._current_sister_mtime()
+        if changed or mtime != self._sister_db_mtime:
+            self._sister_db_mtime = mtime
+            self._refresh_current()
+
     # -- startup update check ---------------------------------------------------------
     def maybe_check_updates(self) -> None:
         """Start a non-blocking update check if the user enabled it."""
@@ -283,6 +348,10 @@ class MainWindow(QWidget):
             return
         # The Settings view owns the update dialog/installer flow.
         settings_view = self._views[-1]
+        # „Später“ gilt für die laufende Sitzung — der Stunden-Check fragt
+        # nicht jede Stunde erneut nach derselben Version.
+        if info.tag in getattr(settings_view, "session_dismissed", set()):
+            return
         if self.ctx.config.get("update_auto_install", False) and info.asset_url \
                 and hasattr(settings_view, "auto_install"):
             settings_view.auto_install(info)
