@@ -1,0 +1,15 @@
+# KFZ-Manager — runtime + build dependencies (pinned)
+# Local dev verified on Python 3.14 (win_amd64). The released app is built in CI
+# on the Python version pinned in .github/workflows/release.yml (currently 3.12);
+# keep that workflow and this file's Python target in step.
+
+# --- GUI ---
+PyQt6==6.11.0
+PyQt6-Qt6==6.11.1
+PyQt6-sip==13.11.1
+
+# --- Packaging (build-time only) ---
+pyinstaller==6.16.0
+
+# --- Tests (dev only) ---
+pytest==8.4.2

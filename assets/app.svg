@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- KFZ-Manager app icon: navy tile + accent ring + car silhouette.
+       Same family language as the HaushaltsManager's ring emblem. -->
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#101a31"/>
+      <stop offset="1" stop-color="#0d1526"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#4d86f5"/>
+      <stop offset="1" stop-color="#2f6cdf"/>
+    </linearGradient>
+  </defs>
+  <rect x="16" y="16" width="480" height="480" rx="104" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="164" fill="none" stroke="url(#accent)" stroke-width="26"/>
+  <!-- car: cabin + body as one white silhouette -->
+  <g fill="#ffffff">
+    <path d="M196 244l22-34c5-8 14-13 24-13h28c10 0 19 5 24 13l22 34z"/>
+    <rect x="152" y="240" width="208" height="62" rx="20"/>
+  </g>
+  <!-- windscreen cutout -->
+  <path d="M228 240l14-22c2-3 5-5 9-5h10c4 0 7 2 9 5l14 22z" fill="#101a31"/>
+  <!-- wheels (drawn over the body so they read as tyres) -->
+  <circle cx="206" cy="302" r="24" fill="#0d1526"/>
+  <circle cx="306" cy="302" r="24" fill="#0d1526"/>
+  <circle cx="206" cy="302" r="10" fill="#4d86f5"/>
+  <circle cx="306" cy="302" r="10" fill="#4d86f5"/>
+</svg>

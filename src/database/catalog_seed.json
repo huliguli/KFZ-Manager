@@ -1,0 +1,395 @@
+{
+  "comment": "Kuratierter Pflege-Empfehlungskatalog. Regeln: nur reale, etablierte Produkte als Beispiel nennen (keine Artikelnummern, keine Preise); Empfehlungen ersetzen keine Herstellervorgaben. Merge erfolgt additiv über die stabile id — bestehende Einträge werden bei App-Updates nie überschrieben.",
+  "catalog_version": 1,
+  "items": [
+    {
+      "id": "seed-oelwechsel-standard",
+      "name": "Motoröl + Filter wechseln",
+      "kategorie": "Öl",
+      "bedingungen": {"kraftstoff": ["benzin", "diesel", "hev", "phev", "lpg", "cng"]},
+      "intervall_km": 15000,
+      "intervall_monate": 12,
+      "warum": "Frisches Öl schützt Lager, Kette/Steuertrieb und Turbo. Öl altert auch ohne Fahrleistung (Kondenswasser, Additive bauen ab) — deshalb zählt neben den km auch die Zeit. Viskosität und Freigabe aus dem Serviceheft haben Vorrang.",
+      "produkt_beispiel": "Öl nach Herstellerfreigabe, z. B. Liqui Moly Top Tec oder Castrol Edge in der freigegebenen Viskosität"
+    },
+    {
+      "id": "seed-oelwechsel-kurzstrecke",
+      "name": "Ölwechsel-Intervall verkürzen (Kurzstrecke)",
+      "kategorie": "Öl",
+      "bedingungen": {"kraftstoff": ["benzin", "diesel", "lpg", "cng"], "fahrprofil": ["kurzstrecke"]},
+      "intervall_km": 10000,
+      "intervall_monate": 12,
+      "warum": "Bei überwiegend Kurzstrecke erreicht das Öl selten Betriebstemperatur: Kraftstoff- und Wassereintrag verdünnen es schneller. Ein verkürztes Intervall gleicht das aus.",
+      "produkt_beispiel": "Öl nach Herstellerfreigabe (siehe Serviceheft)"
+    },
+    {
+      "id": "seed-injektor-reiniger-benzin-di",
+      "name": "Kraftstoffsystem-Reiniger (Benzin-Direkteinspritzer)",
+      "kategorie": "Additiv",
+      "bedingungen": {"kraftstoff": ["benzin", "hev", "phev"], "direkteinspritzung": true},
+      "intervall_km": 10000,
+      "intervall_monate": 12,
+      "warum": "Direkteinspritzer neigen zu Ablagerungen an Injektoren und Einlassventilen; ein Reinigungsadditiv im Tank hält das Spritzbild sauber und beugt Leistungs-/Verbrauchsdrift vor.",
+      "produkt_beispiel": "z. B. Liqui Moly Injection Reiniger"
+    },
+    {
+      "id": "seed-ventil-sauber-benzin-saugrohr",
+      "name": "Ventil-Reiniger (Benziner mit Saugrohreinspritzung)",
+      "kategorie": "Additiv",
+      "bedingungen": {"kraftstoff": ["benzin", "lpg"], "direkteinspritzung": false},
+      "intervall_km": 10000,
+      "intervall_monate": 12,
+      "warum": "Bei Saugrohreinspritzung werden die Einlassventile vom Kraftstoff umspült — ein Additiv kann Ablagerungen dort tatsächlich lösen und den Rundlauf verbessern.",
+      "produkt_beispiel": "z. B. Liqui Moly Ventil Sauber"
+    },
+    {
+      "id": "seed-diesel-spuelung",
+      "name": "Diesel-Systemreinigung",
+      "kategorie": "Additiv",
+      "bedingungen": {"kraftstoff": ["diesel"]},
+      "intervall_km": 10000,
+      "intervall_monate": 12,
+      "warum": "Verkokte Injektoren verschlechtern Spritzbild, Verbrauch und Kaltstart. Eine Systemreinigung im Tank hält Düsen und Pumpe sauber — besonders sinnvoll vor langen Fahrten oder der HU.",
+      "produkt_beispiel": "z. B. Liqui Moly Diesel Spülung"
+    },
+    {
+      "id": "seed-dpf-regenerationsfahrt",
+      "name": "DPF-Regenerationsfahrt",
+      "kategorie": "DPF",
+      "bedingungen": {"kraftstoff": ["diesel"], "partikelfilter": ["dpf"], "fahrprofil": ["kurzstrecke", "mix"]},
+      "intervall_monate": 1,
+      "warum": "Der Dieselpartikelfilter regeneriert nur bei hoher Abgastemperatur. Wer viel Kurzstrecke fährt, sollte regelmäßig 20–30 Minuten Landstraße/Autobahn bei mittlerer Drehzahl fahren, damit der Filter freibrennen kann — sonst droht Verstopfung und ein teurer Tausch.",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-dpf-schutz-additiv",
+      "name": "DPF-Schutz-Additiv",
+      "kategorie": "DPF",
+      "bedingungen": {"kraftstoff": ["diesel"], "partikelfilter": ["dpf"], "fahrprofil": ["kurzstrecke"]},
+      "intervall_km": 5000,
+      "intervall_monate": 6,
+      "warum": "Senkt die Rußzündtemperatur, sodass die Regeneration auch im Kurzstreckenbetrieb häufiger vollständig durchläuft und der Filter länger hält.",
+      "produkt_beispiel": "z. B. Liqui Moly Diesel Partikelfilter Schutz"
+    },
+    {
+      "id": "seed-opf-autobahnfahrt",
+      "name": "OPF freifahren (Benziner mit Ottopartikelfilter)",
+      "kategorie": "DPF",
+      "bedingungen": {"kraftstoff": ["benzin", "hev", "phev"], "partikelfilter": ["opf"], "fahrprofil": ["kurzstrecke"]},
+      "intervall_monate": 1,
+      "warum": "Auch Ottopartikelfilter brauchen Temperatur zum Regenerieren. Bei reinem Stadtbetrieb hilft eine regelmäßige zügige Überlandfahrt, Beladung abzubauen.",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-zuendkerzen",
+      "name": "Zündkerzen prüfen/wechseln",
+      "kategorie": "Allgemein",
+      "bedingungen": {"kraftstoff": ["benzin", "hev", "phev", "lpg", "cng"]},
+      "intervall_km": 60000,
+      "intervall_monate": 48,
+      "warum": "Verschlissene Kerzen kosten Laufruhe und können Zündaussetzer verursachen, die den Katalysator schädigen. Gas-Fahrzeuge (LPG/CNG) verschleißen Kerzen schneller — Herstellerangabe beachten.",
+      "produkt_beispiel": "Kerzen nach Herstellerspezifikation, z. B. NGK oder Bosch"
+    },
+    {
+      "id": "seed-luftfilter",
+      "name": "Motorluftfilter wechseln",
+      "kategorie": "Allgemein",
+      "bedingungen": {"kraftstoff": ["benzin", "diesel", "hev", "phev", "lpg", "cng"]},
+      "intervall_km": 60000,
+      "intervall_monate": 48,
+      "warum": "Ein zugesetzter Luftfilter kostet Leistung und erhöht den Verbrauch. Bei staubigen Strecken früher wechseln.",
+      "produkt_beispiel": "z. B. MANN-FILTER oder Mahle Luftfilter"
+    },
+    {
+      "id": "seed-innenraumfilter",
+      "name": "Innenraum-/Pollenfilter wechseln",
+      "kategorie": "Innenraum",
+      "bedingungen": {},
+      "intervall_km": 15000,
+      "intervall_monate": 12,
+      "warum": "Ein alter Innenraumfilter lässt Scheiben schneller beschlagen und belastet Allergiker. Jährlicher Wechsel (idealerweise vor der Pollensaison) hält Lüftung und Klimaanlage hygienisch.",
+      "produkt_beispiel": "z. B. MANN-FILTER FreciousPlus (Aktivkohle)"
+    },
+    {
+      "id": "seed-kraftstofffilter-diesel",
+      "name": "Kraftstofffilter wechseln (Diesel)",
+      "kategorie": "Allgemein",
+      "bedingungen": {"kraftstoff": ["diesel"]},
+      "intervall_km": 60000,
+      "intervall_monate": 48,
+      "warum": "Wasser und Schmutz im Dieselfilter gefährden die empfindliche Hochdruck-Einspritzung. Regelmäßiger Wechsel schützt Injektoren und Pumpe.",
+      "produkt_beispiel": "Filter nach Herstellerspezifikation, z. B. MANN-FILTER"
+    },
+    {
+      "id": "seed-getriebeoel-dsg",
+      "name": "Getriebeölwechsel (Doppelkupplung/DSG)",
+      "kategorie": "Öl",
+      "bedingungen": {"getriebe": ["dsg"]},
+      "intervall_km": 60000,
+      "warum": "Nasslauf-Doppelkupplungsgetriebe brauchen frisches Öl für Kupplungen und Mechatronik — der klassische 60.000-km-Rhythmus (Herstellerangabe prüfen) verhindert Ruckeln und teure Schäden.",
+      "produkt_beispiel": "Getriebeöl nach Herstellerfreigabe, Wechsel in der Fachwerkstatt"
+    },
+    {
+      "id": "seed-getriebeoel-wandler",
+      "name": "Automatikgetriebeöl wechseln (Wandler)",
+      "kategorie": "Öl",
+      "bedingungen": {"getriebe": ["wandler"], "min_laufleistung_km": 80000},
+      "intervall_km": 80000,
+      "warum": "„Lifetime“-Füllungen sind auf die Erstnutzung gerechnet. Ab höheren Laufleistungen verlängert eine Spülung/Neubefüllung das Getriebeleben spürbar — speziell bei Anhängerbetrieb.",
+      "produkt_beispiel": "ATF nach Herstellerfreigabe, Wechsel in der Fachwerkstatt"
+    },
+    {
+      "id": "seed-bremsfluessigkeit",
+      "name": "Bremsflüssigkeit wechseln",
+      "kategorie": "Allgemein",
+      "bedingungen": {},
+      "intervall_monate": 24,
+      "warum": "Bremsflüssigkeit zieht Wasser: der Siedepunkt sinkt, im Extremfall versagt die Bremse bei starker Beanspruchung (Dampfblasen). Der 2-Jahres-Wechsel ist eine der wichtigsten Sicherheitswartungen.",
+      "produkt_beispiel": "DOT-Spezifikation laut Serviceheft, z. B. ATE oder Bosch Bremsflüssigkeit"
+    },
+    {
+      "id": "seed-kuehlmittel-check",
+      "name": "Kühlmittelstand + Frostschutz prüfen",
+      "kategorie": "Kühlsystem",
+      "bedingungen": {"kraftstoff": ["benzin", "diesel", "hev", "phev", "lpg", "cng"]},
+      "intervall_monate": 12,
+      "warum": "Zu wenig Frostschutz gefährdet Motor und Kühler im Winter, zu altes Kühlmittel verliert seinen Korrosionsschutz. Einmal jährlich (vor dem Winter) Stand und Frostschutzgrenze prüfen; Wechsel nach Herstellervorgabe.",
+      "produkt_beispiel": "Kühlmittel nach Herstellerfreigabe (Farbe/Norm nicht mischen)"
+    },
+    {
+      "id": "seed-klimaservice",
+      "name": "Klimaanlagen-Service + Desinfektion",
+      "kategorie": "Innenraum",
+      "bedingungen": {},
+      "intervall_monate": 24,
+      "warum": "Kältemittel entweicht schleichend (Leistungsverlust), und feuchte Verdampfer werden zur Keimquelle (muffiger Geruch). Alle zwei Jahre Service, Desinfektion bei Geruch auch dazwischen.",
+      "produkt_beispiel": "Desinfektion z. B. mit Sonax Klimaanlagenreiniger; Kältemittelservice in der Werkstatt"
+    },
+    {
+      "id": "seed-wischerblaetter",
+      "name": "Wischerblätter erneuern",
+      "kategorie": "Allgemein",
+      "bedingungen": {},
+      "intervall_monate": 12,
+      "warum": "Verhärtete Wischgummis schmieren genau dann, wenn es darauf ankommt (Gegenlicht, Starkregen). Jährlicher Tausch — idealerweise vor dem Winter — ist günstige Sicherheitspflege.",
+      "produkt_beispiel": "z. B. Bosch Aerotwin"
+    },
+    {
+      "id": "seed-scheibenfrostschutz",
+      "name": "Scheibenwaschanlage auf Winterbetrieb umstellen",
+      "kategorie": "Allgemein",
+      "bedingungen": {},
+      "intervall_monate": 12,
+      "warum": "Eingefrorene Waschdüsen bedeuten Blindflug bei Salzmatsch. Im Herbst Frostschutz bis mindestens −20 °C auffüllen und Düsen testen.",
+      "produkt_beispiel": "z. B. Sonax AntiFrost&KlarSicht"
+    },
+    {
+      "id": "seed-batterie-check",
+      "name": "12-V-Batterie prüfen (Ladezustand/Pole)",
+      "kategorie": "Allgemein",
+      "bedingungen": {"min_alter_jahre": 4},
+      "intervall_monate": 12,
+      "warum": "Ab etwa dem vierten Jahr steigt das Ausfallrisiko deutlich — meist am ersten kalten Morgen. Ruhespannung prüfen (lassen), Pole fetten, bei Schwäche rechtzeitig tauschen.",
+      "produkt_beispiel": "Prüfung bei Werkstatt/ADAC; Polfett z. B. von Liqui Moly"
+    },
+    {
+      "id": "seed-reifendruck",
+      "name": "Reifendruck + Zustand prüfen",
+      "kategorie": "Allgemein",
+      "bedingungen": {},
+      "intervall_monate": 1,
+      "warum": "Zu niedriger Druck erhöht Verbrauch und Verschleiß und verschlechtert das Fahrverhalten. Monatlich kalt prüfen (Werte laut Tankdeckel/Türholm), dabei auf Beschädigungen achten.",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-reifenwechsel-saison",
+      "name": "Saisonaler Reifenwechsel (O-bis-O)",
+      "kategorie": "Allgemein",
+      "bedingungen": {},
+      "intervall_monate": 6,
+      "warum": "Von Ostern bis Oktober Sommerreifen, danach Winterreifen: die Gummimischungen sind auf die jeweilige Temperatur ausgelegt. Beim Wechsel Profiltiefe und Reifenalter (DOT) kontrollieren.",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-lack-waesche",
+      "name": "Gründliche Handwäsche",
+      "kategorie": "Lack",
+      "bedingungen": {},
+      "intervall_monate": 2,
+      "warum": "Insekten, Vogelkot und Salz greifen den Klarlack chemisch an, wenn sie lange einwirken. Die Zwei-Eimer-Handwäsche vermeidet zudem Waschanlagen-Kratzer.",
+      "produkt_beispiel": "z. B. Sonax AutoShampoo, Koch-Chemie Nano Magic Shampoo"
+    },
+    {
+      "id": "seed-lack-wachs",
+      "name": "Lack wachsen/versiegeln",
+      "kategorie": "Lack",
+      "bedingungen": {},
+      "intervall_monate": 6,
+      "warum": "Eine Wachs- oder Polymerschicht lässt Wasser abperlen, erleichtert jede weitere Wäsche und schützt den Klarlack vor UV und Umwelteinflüssen. Zweimal jährlich (Frühjahr/Herbst) genügt.",
+      "produkt_beispiel": "z. B. Sonax Xtreme Brilliant Wax oder Dr. Wack A1 Speed Wax"
+    },
+    {
+      "id": "seed-felgen",
+      "name": "Felgen reinigen + versiegeln",
+      "kategorie": "Lack",
+      "bedingungen": {},
+      "intervall_monate": 3,
+      "warum": "Eingebrannter Bremsstaub frisst sich in den Felgenlack. Regelmäßige säurefreie Reinigung plus Versiegelung hält Felgen dauerhaft ansehnlich.",
+      "produkt_beispiel": "z. B. Sonax Felgen Beast (säurefrei)"
+    },
+    {
+      "id": "seed-unterboden-fruehjahr",
+      "name": "Unterbodenwäsche nach der Salzsaison",
+      "kategorie": "Lack",
+      "bedingungen": {},
+      "intervall_monate": 12,
+      "warum": "Streusalzreste korrodieren Unterboden, Bremsleitungen und Falze das ganze Jahr weiter. Nach dem Winter einmal gründlich den Unterboden waschen (Waschanlage mit Unterbodenprogramm oder SB-Lanze).",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-gummipflege",
+      "name": "Türdichtungen pflegen",
+      "kategorie": "Innenraum",
+      "bedingungen": {},
+      "intervall_monate": 6,
+      "warum": "Gepflegte Gummidichtungen frieren im Winter nicht an, bleiben elastisch und dichten länger — günstige 10-Minuten-Pflege im Frühjahr und Herbst.",
+      "produkt_beispiel": "z. B. Sonax GummiPfleger oder Nigrin Gummi-Pflege"
+    },
+    {
+      "id": "seed-cockpit-kunststoff",
+      "name": "Innenraum: Kunststoffpflege",
+      "kategorie": "Innenraum",
+      "bedingungen": {},
+      "intervall_monate": 6,
+      "warum": "UV-Strahlung bleicht Kunststoffe aus und macht sie spröde. Reinigung plus mattes Pflegemittel hält Armaturen ansehnlich, ohne zu spiegeln.",
+      "produkt_beispiel": "z. B. Sonax Cockpit-Pfleger Matteffect"
+    },
+    {
+      "id": "seed-leder",
+      "name": "Lederpflege (Sitze/Lenkrad)",
+      "kategorie": "Innenraum",
+      "bedingungen": {},
+      "intervall_monate": 6,
+      "warum": "Leder trocknet aus und reißt an den Einstiegswangen zuerst. Halbjährlich reinigen und rückfetten hält es geschmeidig — nur relevant bei Lederausstattung.",
+      "produkt_beispiel": "z. B. Sonax PremiumClass LederPflegeSet oder Colourlock"
+    },
+    {
+      "id": "seed-cera-tec",
+      "name": "Verschleißschutz-Additiv fürs Motoröl",
+      "kategorie": "Additiv",
+      "bedingungen": {"kraftstoff": ["benzin", "diesel", "lpg", "cng"], "min_laufleistung_km": 100000},
+      "intervall_km": 50000,
+      "warum": "Bei Motoren jenseits der 100.000 km kann ein keramischer Reibungsminderer Verschleiß an Lagern und Laufbahnen reduzieren. Kein Wundermittel — Ölwechselintervalle bleiben unverändert.",
+      "produkt_beispiel": "z. B. Liqui Moly Cera Tec"
+    },
+    {
+      "id": "seed-motor-clean",
+      "name": "Ölsystem-Spülung vor dem Ölwechsel",
+      "kategorie": "Additiv",
+      "bedingungen": {"kraftstoff": ["benzin", "diesel", "lpg", "cng"], "min_laufleistung_km": 100000},
+      "intervall_km": 30000,
+      "warum": "Löst Ölschlamm und Ablagerungen kurz vor dem Wechsel, damit das frische Öl nicht sofort verschmutzt — sinnvoll bei unbekannter Wartungshistorie oder viel Kurzstrecke.",
+      "produkt_beispiel": "z. B. Liqui Moly Motor Clean (nur unmittelbar vor dem Ölwechsel)"
+    },
+    {
+      "id": "seed-turbo-schlaeuche",
+      "name": "Ladeluft-/Unterdruckschläuche prüfen",
+      "kategorie": "Allgemein",
+      "bedingungen": {"aufladung": ["turbo", "biturbo", "kompressor"], "min_alter_jahre": 8},
+      "intervall_monate": 12,
+      "warum": "Bei älteren aufgeladenen Motoren werden Ladeluft- und Unterdruckschläuche porös: Leistungsverlust, Notlauf und erhöhter Verbrauch sind typische Folgen. Jährliche Sichtprüfung auf Risse und ölfeuchte Stellen.",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-lpg-ventilschutz",
+      "name": "Ventilschutz-Additiv (Gasbetrieb)",
+      "kategorie": "Additiv",
+      "bedingungen": {"kraftstoff": ["lpg", "cng"]},
+      "intervall_km": 5000,
+      "warum": "Gasbetrieb läuft heißer und ohne die kühlende/schmierende Wirkung von Benzinadditiven — weiche Ventilsitze verschleißen schneller. Ein dosiertes Ventilschutzmittel beugt dem vor (bei Motoren ohne gehärtete Sitze).",
+      "produkt_beispiel": "z. B. Flashlube Valve Saver (mit Dosieranlage)"
+    },
+    {
+      "id": "seed-ev-bremsenpflege",
+      "name": "Bremsen gängig halten (Rekuperation)",
+      "kategorie": "E-Auto",
+      "bedingungen": {"kraftstoff": ["elektro", "phev", "hev"]},
+      "intervall_monate": 12,
+      "warum": "E-Autos bremsen meist elektrisch — die mechanische Bremse rostet mangels Benutzung fest (festsitzende Sättel, Rostabplatzungen an Scheiben sind ein häufiger HU-Mangel). Regelmäßig gezielt mechanisch bremsen und die Bremse jährlich prüfen/warten lassen.",
+      "produkt_beispiel": "Bremsen-Service in der Werkstatt (Sättel gangbar machen, Beläge prüfen)"
+    },
+    {
+      "id": "seed-ev-12v-batterie",
+      "name": "12-V-Bordnetzbatterie prüfen (E-Auto)",
+      "kategorie": "E-Auto",
+      "bedingungen": {"kraftstoff": ["elektro"]},
+      "intervall_monate": 12,
+      "warum": "Auch E-Autos haben eine kleine 12-V-Batterie — und die ist dort die häufigste Pannenursache: ist sie leer, startet das ganze Fahrzeug nicht, egal wie voll der Akku ist. Jährlich prüfen (lassen).",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-ev-reifenrotation",
+      "name": "Reifen rotieren/achsweise tauschen",
+      "kategorie": "E-Auto",
+      "bedingungen": {"kraftstoff": ["elektro"]},
+      "intervall_km": 10000,
+      "warum": "Hohes Gewicht und sofortiges Drehmoment verschleißen Reifen an der Antriebsachse deutlich schneller. Regelmäßige Rotation verteilt den Verschleiß und verlängert die Reifenlebensdauer spürbar.",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-ev-klimaservice",
+      "name": "Klima-/Wärmepumpen-Service (E-Auto)",
+      "kategorie": "E-Auto",
+      "bedingungen": {"kraftstoff": ["elektro"]},
+      "intervall_monate": 24,
+      "warum": "Beim E-Auto temperiert der Kältekreis nicht nur den Innenraum, sondern oft auch die Antriebsbatterie (Wärmepumpe). Ein dichter, gewarteter Kreislauf sichert Reichweite und Batterielebensdauer.",
+      "produkt_beispiel": "Service in der Fachwerkstatt (Kältemittel/Dichtheit)"
+    },
+    {
+      "id": "seed-ev-hv-kuehlmittel",
+      "name": "HV-Batterie-Kühlmittel nach Herstellervorgabe",
+      "kategorie": "E-Auto",
+      "bedingungen": {"kraftstoff": ["elektro", "phev"]},
+      "intervall_monate": 48,
+      "warum": "Viele Hersteller schreiben für den Hochvolt-Kühlkreislauf feste Wechsel-/Prüfintervalle vor. Arbeiten am HV-System gehören ausschließlich in die Fachwerkstatt — hier nur den Termin im Blick behalten.",
+      "produkt_beispiel": "Nur Fachwerkstatt; Intervall laut Serviceplan des Herstellers"
+    },
+    {
+      "id": "seed-hybrid-verbrenner-fordern",
+      "name": "Verbrenner regelmäßig auf Temperatur bringen (Hybrid)",
+      "kategorie": "Allgemein",
+      "bedingungen": {"kraftstoff": ["hev", "phev"], "fahrprofil": ["kurzstrecke"]},
+      "intervall_monate": 1,
+      "warum": "Springt der Verbrenner im Hybrid immer nur kurz an, sammeln sich Kraftstoff und Kondenswasser im Öl und der Auspuff korrodiert von innen. Einmal im Monat eine längere Fahrt, bei der der Motor richtig warm wird, wirkt dem entgegen.",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-hybrid-oel-nach-zeit",
+      "name": "Ölwechsel nach Zeit statt km (Hybrid)",
+      "kategorie": "Öl",
+      "bedingungen": {"kraftstoff": ["hev", "phev"]},
+      "intervall_monate": 12,
+      "warum": "Hybride sammeln km oft elektrisch — der Verbrenner altert trotzdem (Kaltstarts, Kondenswasser). Deshalb das Ölwechselintervall an der Zeit festmachen, nicht an der geringen km-Leistung.",
+      "produkt_beispiel": "Öl nach Herstellerfreigabe"
+    },
+    {
+      "id": "seed-scheinwerfer-check",
+      "name": "Beleuchtung rundum prüfen",
+      "kategorie": "Allgemein",
+      "bedingungen": {},
+      "intervall_monate": 6,
+      "warum": "Defekte Leuchten sind ein häufiger, leicht vermeidbarer HU-Mangel und ein Sicherheitsrisiko. Im Frühjahr und vor dem Winter einmal alle Lichtfunktionen durchschalten (oder beim Lichttest im Oktober prüfen lassen).",
+      "produkt_beispiel": ""
+    },
+    {
+      "id": "seed-wankel-oelstand",
+      "name": "Ölstand engmaschig prüfen (Wankelmotor)",
+      "kategorie": "Öl",
+      "bedingungen": {"motorbauform": ["wankel"]},
+      "intervall_km": 1000,
+      "intervall_monate": 1,
+      "warum": "Wankelmotoren verbrennen konstruktionsbedingt Öl zur Schmierung der Dichtleisten — der Ölstand sinkt im Normalbetrieb. Monatlich bzw. alle 1.000 km prüfen und nachfüllen.",
+      "produkt_beispiel": "Öl nach Herstellerfreigabe"
+    }
+  ]
+}

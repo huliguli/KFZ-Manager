@@ -1,0 +1,59 @@
+# ==========================================================================
+#  KFZ-Manager — .gitignore
+#  PRIVACY-CRITICAL: real vehicle/cost data must NEVER reach the repo.
+# ==========================================================================
+
+# --- Real / local data (NEVER commit) ------------------------------------
+*.db
+*.sqlite
+*.sqlite3
+attachments/
+
+# --- Runtime app data / logs ----------------------------------------------
+logs/
+*.log
+config.json
+src/config.json
+
+# --- Python ----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+.coverage
+htmlcov/
+
+# --- Virtual environments ---------------------------------------------------
+.venv/
+venv/
+env/
+ENV/
+
+# --- PyInstaller / build output ----------------------------------------------
+build/
+dist/
+*.spec.bak
+*.manifest
+
+# --- Code-signing material (NEVER commit) ------------------------------------
+cert/
+*.pfx
+*.cer
+*.snk
+
+# --- Local notes / working docs (never publish) -------------------------------
+*.local.md
+docs/
+CLAUDE.md
+AGENTS.md
+
+# --- Editors / OS ---------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+Thumbs.db
+desktop.ini
+.DS_Store

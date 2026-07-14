@@ -1,0 +1,278 @@
+name: Build and Release
+
+# Triggered by pushing a tag "v*": build BOTH platforms from the same source
+# (100% parity), then publish the GitHub release ATOMICALLY:
+#   * macOS   -> ad-hoc-signed KFZManager.app packed into a .dmg
+#   * Windows -> onedir app wrapped into a signed Inno Setup installer (.exe)
+#
+# The release is created as a DRAFT, all four assets are uploaded, and only
+# then is it flipped to published. Clients query releases/latest, which never
+# returns drafts — so no client can ever see a release without its installer.
+#
+# Release title/notes come from the ANNOTATED tag message: first line = title,
+# rest = markdown body (create with `git tag -a vX.Y.Z -m "Titel" -m "Notes…"`).
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Version prüfen (Tag == version.json)
+        if: github.ref_type == 'tag'
+        run: |
+          ver=$(python3 -c "import json;print(json.load(open('version.json'))['version'])")
+          tag="${GITHUB_REF_NAME#v}"
+          if [ "$ver" != "$tag" ]; then
+            echo "version.json ($ver) passt nicht zum Tag ($tag) - bitte version.json anheben."; exit 1
+          fi
+          echo "Version ok: $ver"
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhängigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Tests ausführen
+        run: python -m pytest -q
+
+      - name: App-Icon (.icns) erzeugen
+        run: |
+          python tools/make_icns.py
+          iconutil -c icns -o assets/app.icns build/AppIcon.iconset
+
+      - name: Anwendung bauen (.app)
+        run: python -m PyInstaller --noconfirm --clean KFZManager.spec
+
+      - name: Ad-hoc signieren
+        run: |
+          codesign --force --deep --sign - dist/KFZManager.app
+          codesign --verify --deep --strict dist/KFZManager.app || echo "codesign verify: Hinweis (ad-hoc)"
+
+      - name: Headless-Smoke (gebautes Bundle startet + rendert)
+        run: |
+          export QT_QPA_PLATFORM=offscreen
+          export KFZ_SMOKE=1 KFZ_VIEW=0 KFZ_THEME=light KFZ_SHOT="$RUNNER_TEMP/smoke.png"
+          dist/KFZManager.app/Contents/MacOS/KFZManager
+          test -f "$RUNNER_TEMP/smoke.png" || { echo "Smoke-Screenshot fehlt - Bundle defekt"; exit 1; }
+          echo "Smoke ok"
+
+      - name: Installer (.dmg) erstellen
+        run: |
+          rm -rf dist/dmg && mkdir -p dist/dmg
+          cp -R dist/KFZManager.app dist/dmg/
+          ln -s /Applications dist/dmg/Applications
+          hdiutil create -volname "KFZManager" -srcfolder dist/dmg \
+            -ov -format UDZO dist/KFZManager-macOS.dmg
+
+      - name: SHA-256 (über das .dmg)
+        run: |
+          shasum -a 256 dist/KFZManager-macOS.dmg | awk '{print $1}' \
+            | tr -d '\n' > dist/KFZManager-macOS.dmg.sha256
+
+      - name: Build-Artefakt hochladen (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KFZManager-macOS
+          path: |
+            dist/KFZManager-macOS.dmg
+            dist/KFZManager-macOS.dmg.sha256
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      # Guard against a forgotten version bump: the installed app reads its own
+      # version from the bundled version.json, so if the release tag is newer than
+      # version.json the updater would offer the same update forever (a loop).
+      - name: Version prüfen (Tag == version.json)
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $ver = (Get-Content version.json -Raw | ConvertFrom-Json).version
+          $tag = "$env:GITHUB_REF_NAME" -replace '^v', ''
+          if ($ver -ne $tag) {
+            Write-Error "version.json ($ver) passt nicht zum Tag ($tag) - bitte version.json anheben."
+            exit 1
+          }
+          Write-Host "Version ok: $ver"
+
+      - name: Python einrichten
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Abhängigkeiten installieren
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Tests ausführen
+        run: python -m pytest -q
+
+      - name: Anwendung bauen (onedir)
+        run: python -m PyInstaller --noconfirm --clean KFZManager.spec
+
+      # Symmetric to the macOS bundle smoke: the BUILT program must start and
+      # render headlessly. Catches the onedir/DLL failure class right where it
+      # would bite (the packaged exe), not in the source tree.
+      - name: Headless-Smoke (gebautes Programm startet + rendert)
+        shell: pwsh
+        timeout-minutes: 5
+        run: |
+          $env:QT_QPA_PLATFORM = "offscreen"
+          $env:KFZ_SMOKE = "1"; $env:KFZ_VIEW = "0"; $env:KFZ_THEME = "light"
+          $env:KFZ_SHOT = Join-Path $env:RUNNER_TEMP "smoke.png"
+          $env:APPDATA = Join-Path $env:RUNNER_TEMP "kfz-appdata"
+          New-Item -ItemType Directory -Force $env:APPDATA | Out-Null
+          $p = Start-Process -FilePath dist\KFZManager\KFZManager.exe -PassThru -Wait -NoNewWindow
+          if ($p.ExitCode -ne 0) { Write-Error "Smoke-Lauf endete mit Exitcode $($p.ExitCode)"; exit 1 }
+          if (-not (Test-Path $env:KFZ_SHOT)) { Write-Error "Smoke-Screenshot fehlt - Build defekt"; exit 1 }
+          Write-Host "Smoke ok"
+
+      # Release gate: a TAG build without the signing certificate would ship an
+      # UNSIGNED installer that every existing client rejects fail-closed
+      # (thumbprint pinning) - auto-update would silently die.
+      # Manual dispatch runs may still build unsigned artefacts for testing.
+      - name: Zertifikat vorbereiten (bei Tag-Build Pflicht)
+        shell: pwsh
+        env:
+          PFX_B64: ${{ secrets.CODESIGN_PFX_BASE64 }}
+        run: |
+          if ($env:PFX_B64) {
+            [IO.File]::WriteAllBytes("cert.pfx", [Convert]::FromBase64String($env:PFX_B64))
+          } elseif ('${{ github.ref_type }}' -eq 'tag') {
+            Write-Error "Secret CODESIGN_PFX_BASE64 fehlt - ein unsigniertes Release wuerde jedes Auto-Update dauerhaft stoppen. Abbruch."
+            exit 1
+          } else {
+            Write-Host "Kein Signatur-Zertifikat hinterlegt (Testlauf ohne Signierung)."
+          }
+
+      - name: Inneres Programm signieren
+        shell: pwsh
+        env:
+          PFX_PW: ${{ secrets.CODESIGN_PFX_PASSWORD }}
+        run: |
+          if (-not (Test-Path cert.pfx)) { Write-Host "ueberspringe"; exit 0 }
+          $ok = $true
+          try { ./sign.ps1 -File dist\KFZManager\KFZManager.exe -Pfx cert.pfx -Password $env:PFX_PW }
+          catch { $ok = $false; Write-Host "Signieren fehlgeschlagen: $_" }
+          if (-not $ok) { exit 1 }
+          exit 0
+
+      - name: Installer bauen (Inno Setup)
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress | Out-Null
+          $ver = (Get-Content version.json -Raw | ConvertFrom-Json).version
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" "/DMyAppVersion=$ver" installer\KFZManager.iss
+
+      - name: Installer signieren (falls Zertifikat hinterlegt)
+        shell: pwsh
+        env:
+          PFX_PW: ${{ secrets.CODESIGN_PFX_PASSWORD }}
+        run: |
+          if (-not (Test-Path cert.pfx)) { Write-Host "ueberspringe"; exit 0 }
+          $ok = $true
+          try { ./sign.ps1 -File dist\KFZManager-Setup.exe -Pfx cert.pfx -Password $env:PFX_PW }
+          catch { $ok = $false; Write-Host "Signieren fehlgeschlagen: $_" }
+          if (-not $ok) { exit 1 }
+          exit 0
+
+      # Post-build verification against the pin the CLIENTS enforce: the
+      # installer must carry exactly one of the thumbprints hardcoded in
+      # updater.py (_TRUSTED_CERT_THUMBPRINTS). Reads the pin from the source
+      # so workflow and app can never drift apart. The runner does not trust
+      # the self-signed root, so 'UnknownError' (untrusted chain, hash intact)
+      # is accepted - exactly like the app itself, which pins the thumbprint.
+      - name: Signatur gegen Client-Pin verifizieren
+        if: github.ref_type == 'tag'
+        shell: pwsh
+        run: |
+          $src = Get-Content src/modules/updater/updater.py -Raw
+          $block = [regex]::Match($src, '_TRUSTED_CERT_THUMBPRINTS\s*=\s*\(([^)]*)\)').Groups[1].Value
+          $pins = [regex]::Matches($block, '"([0-9A-Fa-f]{40})"') | ForEach-Object { $_.Groups[1].Value.ToUpper() }
+          if (-not $pins) { Write-Error "Kein gepinnter Thumbprint in updater.py gefunden."; exit 1 }
+          $sig = Get-AuthenticodeSignature dist\KFZManager-Setup.exe
+          if ($sig.Status -notin @('Valid', 'UnknownError')) {
+            Write-Error "Installer-Signatur ungueltig oder fehlt: $($sig.Status)"; exit 1
+          }
+          if (-not $sig.SignerCertificate) { Write-Error "Installer traegt keine Signatur."; exit 1 }
+          $tp = $sig.SignerCertificate.Thumbprint.ToUpper()
+          if ($pins -notcontains $tp) {
+            Write-Error "Thumbprint $tp entspricht keinem Client-Pin ($($pins -join ', ')) - Bestands-Clients wuerden das Update ablehnen."; exit 1
+          }
+          Write-Host "Signatur ok, Thumbprint gepinnt: $tp"
+
+      - name: Aufräumen + SHA-256 (über die signierte Datei)
+        shell: pwsh
+        run: |
+          Remove-Item cert.pfx -Force -ErrorAction SilentlyContinue
+          (Get-FileHash dist\KFZManager-Setup.exe -Algorithm SHA256).Hash.ToLower() |
+            Set-Content -NoNewline dist\KFZManager-Setup.exe.sha256
+
+      - name: Build-Artefakt hochladen (Windows)
+        uses: actions/upload-artifact@v4
+        with:
+          name: KFZManager-Setup
+          path: |
+            dist/KFZManager-Setup.exe
+            dist/KFZManager-Setup.exe.sha256
+
+  # Publishes ONLY after both platform builds succeeded, and only then makes
+  # the release visible. The .exe.sha256 goes last so the checksum matching
+  # convention (last .sha256 = Windows) stays stable.
+  publish:
+    if: github.ref_type == 'tag'
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Repository auschecken
+        uses: actions/checkout@v4
+
+      - name: Artefakte herunterladen
+        uses: actions/download-artifact@v4
+        with:
+          merge-multiple: true
+          path: assets
+
+      - name: Release als Entwurf anlegen, Assets anhängen, dann veröffentlichen
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+          TAG="$GITHUB_REF_NAME"
+          for f in KFZManager-macOS.dmg KFZManager-macOS.dmg.sha256 \
+                   KFZManager-Setup.exe KFZManager-Setup.exe.sha256; do
+            test -s "assets/$f" || { echo "Asset fehlt oder ist leer: $f"; exit 1; }
+          done
+          # Titel/Notes aus der annotierten Tag-Nachricht (Zeile 1 = Titel).
+          git fetch --force origin "+refs/tags/$TAG:refs/tags/$TAG" >/dev/null 2>&1 || true
+          TITLE=$(git tag -l --format='%(contents:subject)' "$TAG")
+          git tag -l --format='%(contents:body)' "$TAG" > notes.md
+          [ -n "$TITLE" ] || TITLE="$TAG"
+          [ -s notes.md ] || echo "Siehe README für die Neuerungen dieser Version." > notes.md
+          gh release create "$TAG" --draft --title "$TITLE" --notes-file notes.md
+          gh release upload "$TAG" \
+            assets/KFZManager-macOS.dmg \
+            assets/KFZManager-macOS.dmg.sha256 \
+            assets/KFZManager-Setup.exe
+          gh release upload "$TAG" assets/KFZManager-Setup.exe.sha256
+          # Erst jetzt sichtbar machen - Clients sehen NIE ein Release ohne Assets.
+          gh release edit "$TAG" --draft=false --latest
+          echo "Release $TAG veroeffentlicht (alle Assets angehaengt)."
