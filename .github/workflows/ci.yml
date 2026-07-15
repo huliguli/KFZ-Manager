@@ -42,5 +42,12 @@ jobs:
       - name: Quellcode kompilieren
         run: python -m compileall -q src
 
+      # Belegpflicht des Fahrzeug-Katalogs: jede kuratierte Zeile braucht
+      # Quelle + wörtliches Zitat, Motorcodes zusätzlich einen per-Code-Beleg
+      # (kein Sammelzeilen-Zitat). Fail closed — lieber kein Eintrag als ein
+      # falscher, der eine falsche Wartungsempfehlung auslöst.
+      - name: Fahrzeug-Katalog prüfen (Belegpflicht)
+        run: python tools/check_vehicle_seed.py
+
       - name: Tests ausführen
         run: python -m pytest -q
