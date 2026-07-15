@@ -57,3 +57,6 @@ AGENTS.md
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Kuratierungs-Rohdaten (Zwischenstand, nicht ausliefern)
+katalog-roh/

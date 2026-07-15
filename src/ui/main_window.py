@@ -221,7 +221,7 @@ class MainWindow(QWidget):
 
     def _add_vehicle(self) -> None:
         from ui.dialogs import VehicleDialog
-        dlg = VehicleDialog(parent=self)
+        dlg = VehicleDialog(parent=self, db=self.ctx.db)
         if dlg.exec():
             new_id = self.ctx.vehicles.add(dlg.result_model)
             self.ctx.set_vehicle(new_id)

@@ -80,6 +80,20 @@ def _opt_int(text: str, label: str) -> int | None:
     return value
 
 
+def _kba_titel(text: str) -> str:
+    """Behörden-Schreibweise in lesbare Form bringen.
+
+    Die KBA-Liste führt „VOLKSWAGEN-VW" und „GOLF" durchgängig in
+    Großbuchstaben; im Fahrzeugprofil steht das sonst als Geschrei. Aus
+    Kürzeln (VW, BMW, GTI …) wird bewusst nichts gemacht — sie bleiben groß.
+    """
+    def wort(w: str) -> str:
+        return w if (len(w) <= 3 or not w.isalpha()) else w.capitalize()
+
+    parts = [wort(p) for p in (text or "").split()]
+    return " ".join(parts)
+
+
 def _vocab_combo(values: list[str], labels: dict[str, str],
                  current: str | None, optional: bool = True) -> QComboBox:
     """Combo box over a machine-value vocabulary with German labels."""
@@ -164,11 +178,25 @@ class _BaseDialog(QDialog):
 
 # --- Vehicle -----------------------------------------------------------------
 class VehicleDialog(_BaseDialog):
-    """Add/edit a vehicle with the full recommendation-relevant profile."""
+    """Add/edit a vehicle with the full recommendation-relevant profile.
 
-    def __init__(self, item: Vehicle | None = None, parent=None) -> None:
+    Der Katalog-Knopf oben belegt die Profilfelder vor (Marke/Baureihe/Motor
+    oder HSN/TSN aus dem Fahrzeugschein) — alles bleibt danach frei
+    editierbar. Von Hand geänderte Felder werden in ``profil_dirty``
+    vermerkt, damit spätere Katalog-Updates sie nie überschreiben.
+
+    ``db`` wird nur für den Katalog gebraucht; ohne DB (z. B. im Wizard vor
+    dem ersten Start) erscheint der Knopf schlicht nicht.
+    """
+
+    def __init__(self, item: Vehicle | None = None, parent=None, db=None) -> None:
         super().__init__("Fahrzeug bearbeiten" if item else "Fahrzeug anlegen", parent)
         self._id = item.id if item else None
+        self._db = db
+        self._katalog_motorisierung_id = item.katalog_motorisierung_id if item else None
+        self._motorcode = item.motorcode if item else ""
+        self._motorcode_herkunft = item.motorcode_herkunft if item else None
+        self._dirty: set[str] = set(item.profil_dirty) if item else set()
 
         self.name = QLineEdit(item.name if item else "")
         self.name.setPlaceholderText("z. B. Roter Flitzer")
@@ -218,6 +246,25 @@ class VehicleDialog(_BaseDialog):
                                        item.fahrprofil if item else None)
         self.notiz = QLineEdit(item.notiz if item else "")
 
+        # Katalog-Einstieg ganz oben: der schnellste Weg zu einem gefüllten
+        # Profil — aber freiwillig, alles darunter bleibt von Hand bedienbar.
+        if db is not None:
+            katalog_row = QHBoxLayout()
+            katalog_btn = QPushButton("Aus Katalog übernehmen …")
+            katalog_btn.setObjectName("Ghost")
+            katalog_btn.clicked.connect(self._pick_from_catalog)
+            self._katalog_info = QLabel("")
+            self._katalog_info.setObjectName("Faint")
+            self._katalog_info.setWordWrap(True)
+            katalog_row.addWidget(katalog_btn)
+            katalog_row.addWidget(self._katalog_info, 1)
+            wrap = QWidget()
+            wrap.setLayout(katalog_row)
+            self.add_row(labelled(
+                "Fahrzeugschein oder Katalog", wrap,
+                hint="Spart das Abtippen: HSN/TSN aus dem Schein oder "
+                     "Marke → Baureihe → Motor. Alle Werte bleiben änderbar."))
+
         self.add_row(labelled("Name/Spitzname *", self.name),
                      labelled("Kennzeichen", self.kennzeichen))
         self.add_row(labelled("Hersteller", self.hersteller),
@@ -237,6 +284,101 @@ class VehicleDialog(_BaseDialog):
         self.add_row(labelled("Öl-Viskosität", self.oel_viskositaet),
                      labelled("Öl-Herstellerfreigabe", self.oel_freigabe))
         self.add_row(labelled("Notiz (optional)", self.notiz))
+        self._track_manual_edits()
+
+    def _track_manual_edits(self) -> None:
+        """Merkt sich, welche Profilfelder der Nutzer selbst angefasst hat.
+
+        Diese Felder sind für die Katalog-Vorbelegung (und für spätere
+        Katalog-Updates) tabu — was der Nutzer eingetragen hat, gewinnt immer.
+        """
+        felder = {
+            "hersteller": self.hersteller, "modell": self.modell,
+            "hubraum_ccm": self.hubraum, "leistung_ps": self.leistung,
+            "oel_viskositaet": self.oel_viskositaet,
+            "oel_freigabe": self.oel_freigabe,
+        }
+        for feld, widget in felder.items():
+            # textEdited (nicht textChanged) feuert nur bei Tastatureingabe,
+            # nicht beim programmatischen setText der Vorbelegung.
+            widget.textEdited.connect(lambda _t, f=feld: self._dirty.add(f))
+        combos = {
+            "kraftstoff": self.kraftstoff, "motorbauform": self.motorbauform,
+            "aufladung": self.aufladung, "partikelfilter": self.partikelfilter,
+            "getriebe": self.getriebe,
+            "direkteinspritzung": self.direkteinspritzung,
+        }
+        for feld, combo in combos.items():
+            # activated feuert ebenfalls nur bei Nutzer-Interaktion.
+            combo.activated.connect(lambda _i, f=feld: self._dirty.add(f))
+
+    # -- Katalog-Vorbelegung ---------------------------------------------------
+    def _pick_from_catalog(self) -> None:
+        """Katalog-Auswahl öffnen und die Profilfelder vorbelegen.
+
+        Von Hand geänderte Felder (``self._dirty``) bleiben unangetastet —
+        der Nutzer hat dort bewusst etwas anderes stehen.
+        """
+        from ui.katalog_dialog import KatalogDialog
+
+        auswahl = KatalogDialog.pick(self._db, self)
+        if auswahl is None:
+            return
+
+        if auswahl.hersteller and "hersteller" not in self._dirty:
+            self.hersteller.setText(_kba_titel(auswahl.hersteller))
+        if auswahl.modell and "modell" not in self._dirty:
+            self.modell.setText(_kba_titel(auswahl.modell))
+
+        uebernommen = []
+        mot = auswahl.motorisierung
+        if mot is not None:
+            self._katalog_motorisierung_id = mot.id
+            for feld, wert in mot.werte.items():
+                if wert is None or feld in self._dirty:
+                    continue
+                if self._set_field(feld, wert):
+                    uebernommen.append(feld)
+
+        # Motorcode NUR, wenn der Nutzer ihn im Dialog bestätigt hat.
+        if auswahl.motorcode_bestaetigt and auswahl.motorcode:
+            self._motorcode = auswahl.motorcode
+            self._motorcode_herkunft = "nutzer"
+        info = []
+        if mot is not None:
+            info.append(f"{mot.anzeigename} übernommen ({len(uebernommen)} Felder)")
+        elif auswahl.hersteller:
+            info.append(f"{auswahl.hersteller} · {auswahl.modell}")
+        if self._motorcode_herkunft == "nutzer" and self._motorcode:
+            info.append(f"Motorcode {self._motorcode} bestätigt")
+        self._katalog_info.setText("  ·  ".join(info))
+
+    def _set_field(self, feld: str, wert) -> bool:
+        """Einen vorbelegten Wert in das passende Widget schreiben."""
+        combos = {
+            "kraftstoff": self.kraftstoff, "motorbauform": self.motorbauform,
+            "aufladung": self.aufladung, "partikelfilter": self.partikelfilter,
+            "getriebe": self.getriebe,
+        }
+        if feld in combos:
+            idx = combos[feld].findData(wert)
+            if idx >= 0:
+                combos[feld].setCurrentIndex(idx)
+                return True
+            return False
+        if feld == "direkteinspritzung":
+            idx = self.direkteinspritzung.findData(bool(wert))
+            if idx >= 0:
+                self.direkteinspritzung.setCurrentIndex(idx)
+                return True
+            return False
+        lines = {"hubraum_ccm": self.hubraum, "leistung_ps": self.leistung,
+                 "oel_viskositaet": self.oel_viskositaet,
+                 "oel_freigabe": self.oel_freigabe}
+        if feld in lines:
+            lines[feld].setText(str(wert))
+            return True
+        return False
 
     def build(self) -> None:
         name = self.name.text().strip()
@@ -265,6 +407,10 @@ class VehicleDialog(_BaseDialog):
             oel_freigabe=self.oel_freigabe.text().strip(),
             fahrprofil=self.fahrprofil.currentData(),
             notiz=self.notiz.text().strip(),
+            katalog_motorisierung_id=self._katalog_motorisierung_id,
+            motorcode=self._motorcode,
+            motorcode_herkunft=self._motorcode_herkunft,
+            profil_dirty=sorted(self._dirty),
         )
 
 

@@ -13,7 +13,8 @@ without a migration.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
+import json
+from dataclasses import dataclass, field
 
 # --- Vehicle profile vocabularies -------------------------------------------
 KRAFTSTOFFE = ["benzin", "diesel", "hev", "phev", "elektro", "lpg", "cng"]
@@ -109,12 +110,24 @@ class Vehicle:
     oel_freigabe: str = ""
     fahrprofil: str | None = None
     notiz: str = ""
+    # --- Fahrzeug-Katalog (schema v2) ---------------------------------------
+    katalog_motorisierung_id: str | None = None   # gewählte Katalog-Motorisierung
+    motorcode: str = ""                           # z. B. 'CDHB'
+    # 'nutzer' = vom Nutzer bestätigt/eingetragen; None = unbekannt.
+    # Es gibt bewusst KEINEN Wert 'katalog': ein Katalog-Vorschlag allein darf
+    # nie eine motorcode-spezifische Empfehlung auslösen (siehe modules.catalog).
+    motorcode_herkunft: str | None = None
+    profil_dirty: list[str] = field(default_factory=list)  # manuell geänderte Felder
     active: bool = True
     id: int | None = None
 
     @staticmethod
     def from_row(row) -> "Vehicle":
         de = row["direkteinspritzung"]
+        try:
+            dirty = json.loads(row["profil_dirty"] or "[]")
+        except (ValueError, TypeError):
+            dirty = []
         return Vehicle(
             id=row["id"],
             name=row["name"],
@@ -137,6 +150,10 @@ class Vehicle:
             oel_freigabe=row["oel_freigabe"] or "",
             fahrprofil=row["fahrprofil"],
             notiz=row["notiz"] or "",
+            katalog_motorisierung_id=row["katalog_motorisierung_id"],
+            motorcode=row["motorcode"] or "",
+            motorcode_herkunft=row["motorcode_herkunft"],
+            profil_dirty=dirty if isinstance(dirty, list) else [],
             active=bool(row["active"]),
         )
 
@@ -163,6 +180,13 @@ class Vehicle:
             "oel_freigabe": self.oel_freigabe or None,
             "fahrprofil": self.fahrprofil,
             "notiz": self.notiz or None,
+            "katalog_motorisierung_id": self.katalog_motorisierung_id,
+            "motorcode": (self.motorcode or "").strip().upper() or None,
+            # Nur 'nutzer' ist ein gültiger Wert; alles andere wird zu NULL —
+            # so kann kein Codepfad versehentlich eine Katalog-Vermutung als
+            # bestätigt markieren (die Empfehlungs-Regeln hängen daran).
+            "motorcode_herkunft": "nutzer" if self.motorcode_herkunft == "nutzer" else None,
+            "profil_dirty": json.dumps(self.profil_dirty or [], ensure_ascii=False),
             "active": 1 if self.active else 0,
         }
 

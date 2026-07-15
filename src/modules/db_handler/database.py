@@ -21,7 +21,7 @@ from modules.logging_setup import get_logger
 
 _log = get_logger("db")
 
-CURRENT_SCHEMA_VERSION = 1
+CURRENT_SCHEMA_VERSION = 2
 
 # Version of the interop contract this app writes (see INTEROP.md). Stored in
 # interop_meta so the sister app can handshake before reading any view.
@@ -56,6 +56,9 @@ WIPE_TABLES = (
     "catalog_hidden",
     "vehicles",
 )
+# Bewusst NICHT in WIPE_TABLES: die katalog_*-Tabellen. Sie enthalten keine
+# Nutzerdaten, sondern mitgelieferte Referenzdaten (Fahrzeug-Katalog, KBA-
+# Schlüsselnummern) — sie werden beim nächsten Start ohnehin neu gemergt.
 
 
 class Database:
@@ -167,21 +170,54 @@ class Database:
         # rows and hides are never touched — see modules.catalog).
         from modules import catalog
         catalog.merge_seed(self)
+        # Seed/merge the vehicle catalog (marques → engines) and the KBA
+        # HSN/TSN list. Both are pure reference data and fail silently: a
+        # broken catalog must never keep the user out of their own data.
+        from modules import vehicle_catalog
+        vehicle_catalog.merge_seed(self)
+        vehicle_catalog.merge_kba_seed(self)
         _log.info("Database ready at %s (schema v%s)", self.path, CURRENT_SCHEMA_VERSION)
 
     def _migrate(self) -> None:
         """Apply forward-compatible schema tweaks to an existing database.
 
         ``executescript`` only creates *missing* tables; a column added to an
-        existing table needs an explicit guarded ``ALTER`` here. v1 has no
-        migrations yet — the hook exists so v2+ follows the proven pattern:
-        guarded ALTERs first, then a ``_migrate_vN`` that bumps the stored
-        version exactly once (see the sister app for worked examples).
+        existing table needs an explicit guarded ``ALTER`` here.
         Views are dropped/recreated by schema.sql design: when a view's SELECT
         changes in a future version, add a ``DROP VIEW IF EXISTS`` step here
         BEFORE executescript recreates it (CREATE VIEW IF NOT EXISTS alone
         would keep the stale definition).
         """
+        # v2 (Fahrzeug-Katalog): rein additive Spalten am Fahrzeugprofil. Auf
+        # einer frischen DB legt schema.sql sie bereits an → die Guards machen
+        # das hier zum No-op; auf einer v1-DB ergänzen sie die Spalten, ohne
+        # eine einzige Nutzerzeile anzufassen.
+        v2_columns = (
+            ("vehicles", "katalog_motorisierung_id", "TEXT"),
+            ("vehicles", "motorcode", "TEXT"),
+            ("vehicles", "motorcode_herkunft", "TEXT"),
+            ("vehicles", "profil_dirty", "TEXT"),
+        )
+        for table, column, decl in v2_columns:
+            if not self._has_column(table, column):
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {decl}")
+                self._column_cache.pop(table, None)
+        self.conn.commit()
+        self._migrate_v2()
+
+    def _migrate_v2(self) -> None:
+        """Record schema v2 on an existing database (run once).
+
+        Die v2-Neuerungen sind die ``katalog_*``-Tabellen (von schema.sql per
+        ``CREATE ... IF NOT EXISTS`` angelegt) plus die vier Profilspalten aus
+        den geführten ALTERs oben — nur der gespeicherte Stand muss hoch, damit
+        Downgrade-Guard und künftige Migrationen die richtige Ebene sehen.
+        """
+        row = self.conn.execute("SELECT version FROM schema_version LIMIT 1").fetchone()
+        if row is None or row["version"] >= 2:
+            return
+        self.conn.execute("UPDATE schema_version SET version = 2")
+        self.conn.commit()
 
     def wipe_all_data(self) -> None:
         """Delete all rows from every user-data table in one transaction.

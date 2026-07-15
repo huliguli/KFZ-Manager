@@ -138,7 +138,7 @@ class FahrzeugeView(BaseView):
         return card
 
     def create_new(self) -> bool:
-        dlg = VehicleDialog(parent=self)
+        dlg = VehicleDialog(parent=self, db=self.ctx.db)
         if dlg.exec():
             new_id = self.ctx.vehicles.add(dlg.result_model)
             # The first vehicle (or a newly created one) becomes active.
@@ -147,7 +147,7 @@ class FahrzeugeView(BaseView):
         return True
 
     def _edit(self, vehicle) -> None:
-        dlg = VehicleDialog(item=vehicle, parent=self)
+        dlg = VehicleDialog(item=vehicle, parent=self, db=self.ctx.db)
         if dlg.exec():
             self.ctx.vehicles.update(dlg.result_model)
             self.ctx.notify_changed()

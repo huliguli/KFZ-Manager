@@ -86,6 +86,11 @@ a = Analysis(
     datas=[
         ('src/database/schema.sql', 'src/database'),
         ('src/database/catalog_seed.json', 'src/database'),
+        # Fahrzeug-Katalog: kuratierte Stammdaten + KBA-Schlüsselnummern
+        # (HSN/TSN aus dem Fahrzeugschein). Beides read-only Referenzdaten.
+        ('src/database/vehicle_seed.json', 'src/database'),
+        ('src/database/kba_seed.csv.gz', 'src/database'),
+        ('src/database/KATALOG-QUELLEN.md', 'src/database'),
         ('version.json', '.'),
         ('assets/app.ico', 'assets'),
     ],

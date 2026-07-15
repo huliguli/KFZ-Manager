@@ -23,6 +23,17 @@ better to show too few suggestions than wrong ones. Supported conditions:
     min_laufleistung_km  int        — current odometer at least this
     max_laufleistung_km  int
     min_alter_jahre      int        — years since first registration
+    motorcode            list[str]  — Motorkennbuchstaben, z. B. ["CDHB"]
+    motorfamilie         list[str]  — z. B. ["EA888-GEN1", "EA888-GEN2"]
+
+Die beiden letzten Bedingungen sind bewusst STRENGER als alle anderen: Sie
+matchen nur, wenn der Nutzer den Motorcode selbst bestätigt hat
+(``vehicle.motorcode_herkunft == 'nutzer'``). Grund: Die Zuordnung
+Motorisierung→Motorcode ist mehrdeutig (Audi A4 B8 „1.8 TFSI 160 PS" = CABB
+ODER CDHB, identische kW/ccm), ein geratener Code würde also falsche
+Wartungshinweise auslösen, die der Nutzer nicht als falsch erkennen kann.
+Ein Katalog-Vorschlag allein löst deshalb NIE eine Empfehlung aus — der
+Katalog fragt, der Nutzer antwortet, erst dann greift die Regel.
 
 Every product named in the seed is a real, established product (Liqui Moly,
 Sonax, Bosch, MANN-FILTER, Flashlube …) referenced WITHOUT invented article
@@ -48,7 +59,10 @@ _log = get_logger("catalog")
 # app versions that do not understand them).
 _LIST_CONDITIONS = ("kraftstoff", "aufladung", "partikelfilter", "getriebe",
                     "fahrprofil", "motorbauform")
-_KNOWN_CONDITIONS = set(_LIST_CONDITIONS) | {
+# Motorcode-Bedingungen laufen NICHT über _LIST_CONDITIONS: sie prüfen nicht
+# ein Profilfeld, sondern eine bestätigte Nutzerangabe (siehe Modul-Docstring).
+_MOTOR_CONDITIONS = ("motorcode", "motorfamilie")
+_KNOWN_CONDITIONS = set(_LIST_CONDITIONS) | set(_MOTOR_CONDITIONS) | {
     "direkteinspritzung", "min_laufleistung_km", "max_laufleistung_km",
     "min_alter_jahre"}
 
@@ -108,17 +122,45 @@ def _vehicle_age_years(vehicle: Vehicle, today: date | None = None) -> float | N
 
 
 def matches(item: CatalogItem, vehicle: Vehicle, km_now: int | None = None,
-            today: date | None = None) -> bool:
+            today: date | None = None, motorfamilie: str | None = None) -> bool:
     """True when every condition of the item holds for the vehicle profile.
 
     ``km_now`` is the best-known current odometer (falls back to the profile
-    reading). Unknown profile values fail the respective condition (see module
+    reading). ``motorfamilie`` is the family the vehicle's CONFIRMED motor code
+    resolves to unambiguously (see modules.vehicle_catalog.motorfamilie_fuer_code);
+    the caller passes it because the resolution needs a database lookup.
+
+    Unknown profile values fail the respective condition (see module
     docstring) — and unknown condition KEYS fail the whole item (fail closed).
     """
     conditions = item.bedingungen or {}
     if any(key not in _KNOWN_CONDITIONS for key in conditions):
         return False
     km = km_now if km_now is not None else vehicle.km_stand
+
+    # --- Motorcode-Bedingungen: nur mit BESTÄTIGTEM Code ---------------------
+    # Fail closed in beide Richtungen: kein Code / nicht bestätigt ⇒ kein Match
+    # (nicht etwa "matcht alles"). Ein Katalog-Vorschlag ist keine Bestätigung.
+    if any(key in conditions for key in _MOTOR_CONDITIONS):
+        if vehicle.motorcode_herkunft != "nutzer" or not vehicle.motorcode:
+            return False
+        code = (vehicle.motorcode or "").strip().upper()
+        if "motorcode" in conditions:
+            allowed = conditions["motorcode"]
+            if not isinstance(allowed, list):
+                allowed = [allowed]
+            if code not in {str(a).strip().upper() for a in allowed}:
+                return False
+        if "motorfamilie" in conditions:
+            allowed = conditions["motorfamilie"]
+            if not isinstance(allowed, list):
+                allowed = [allowed]
+            # Nicht auflösbar oder mehrdeutig ⇒ kein Match.
+            if not motorfamilie:
+                return False
+            if motorfamilie.strip().upper() not in {
+                    str(a).strip().upper() for a in allowed}:
+                return False
 
     for key in _LIST_CONDITIONS:
         if key in conditions:
@@ -153,12 +195,13 @@ def matches(item: CatalogItem, vehicle: Vehicle, km_now: int | None = None,
 def suggestions_for(items: list[CatalogItem], vehicle: Vehicle,
                     hidden_ids: set[str], adopted_ids: set[str],
                     km_now: int | None = None,
-                    today: date | None = None) -> list[CatalogItem]:
+                    today: date | None = None,
+                    motorfamilie: str | None = None) -> list[CatalogItem]:
     """Matching, not-hidden, not-yet-adopted catalog items for one vehicle."""
     return [item for item in items
             if item.id not in hidden_ids
             and item.id not in adopted_ids
-            and matches(item, vehicle, km_now, today)]
+            and matches(item, vehicle, km_now, today, motorfamilie)]
 
 
 def next_user_id(existing_ids: set[str]) -> str:

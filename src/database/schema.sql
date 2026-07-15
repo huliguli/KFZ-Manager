@@ -39,6 +39,12 @@ CREATE TABLE IF NOT EXISTS vehicles (
     oel_freigabe       TEXT,   -- z. B. VW 507 00
     fahrprofil         TEXT,   -- kurzstrecke|mix|langstrecke
     notiz              TEXT,
+    -- v2, Fahrzeug-Katalog: Herkunft der Profildaten (alle optional, NULL =
+    -- vollständig manuell angelegt).
+    katalog_motorisierung_id TEXT,          -- gewählte Katalog-Motorisierung
+    motorcode          TEXT,                -- z. B. 'CDHB'
+    motorcode_herkunft TEXT,                -- 'nutzer' | NULL — NIE 'katalog'!
+    profil_dirty       TEXT,                -- JSON-Array manuell geänderter Felder
     active             INTEGER NOT NULL DEFAULT 1,
     created_at         TEXT    NOT NULL DEFAULT (datetime('now')),
     updated_at         TEXT    NOT NULL DEFAULT (datetime('now'))
@@ -181,6 +187,113 @@ CREATE TABLE IF NOT EXISTS catalog_hidden (
     UNIQUE (vehicle_id, catalog_id)
 );
 
+-- --- Fahrzeug-Katalog (schema v2) --------------------------------------------------
+-- Zweck: Beim Anlegen eines Fahrzeugs sollen Marke/Baureihe/Motorisierung
+-- auswählbar sein und die Profilfelder VORBELEGEN, statt sie abzutippen.
+--
+-- Vertrauensmodell (Kern des ganzen Katalogs!):
+--   * Katalogdaten sind VORSCHLÄGE — sichtbar, editierbar, ohne Gewähr.
+--   * Der MOTORCODE wird NIE aus dem Katalog abgeleitet: die Zuordnung
+--     Motorisierung→Code ist nachweislich mehrdeutig (z. B. Audi A4 B8
+--     „1.8 TFSI 160 PS" = CABB ODER CDHB, identisch in kW und ccm, nur übers
+--     Baujahr unterscheidbar). Ein geratener Code würde falsche
+--     Wartungsempfehlungen auslösen, die der Nutzer nicht als falsch erkennt.
+--     Deshalb: Katalog SCHLÄGT VOR, der Nutzer BESTÄTIGT (vehicles.motorcode_
+--     herkunft = 'nutzer'), und nur dann greifen motorcode-Empfehlungen.
+--   * Jede kuratierte Zeile trägt Quelle + wörtliches Zitat (CI-Gate).
+--
+-- Alle Tabellen sind read-only Katalogdaten: additiver Merge per stabiler
+-- Text-ID (Slug), entfallene Einträge werden getombstoned statt gelöscht
+-- (siehe modules/vehicle_catalog.py).
+CREATE TABLE IF NOT EXISTS katalog_marke (
+    id           TEXT PRIMARY KEY,             -- 'audi' (stabil, nie ändern)
+    name         TEXT NOT NULL,                -- 'Audi' (Wortmarke, NIE Logo)
+    quelle_url   TEXT NOT NULL,
+    quelle_abruf TEXT NOT NULL,                -- ISO
+    deprecated   INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS katalog_baureihe (
+    id         TEXT PRIMARY KEY,               -- 'audi-a4'
+    marke_id   TEXT NOT NULL,
+    name       TEXT NOT NULL,                  -- 'A4'
+    quelle_url TEXT NOT NULL,
+    deprecated INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (marke_id) REFERENCES katalog_marke(id)
+);
+
+CREATE TABLE IF NOT EXISTS katalog_generation (
+    id          TEXT PRIMARY KEY,              -- 'audi-a4-b8'
+    baureihe_id TEXT NOT NULL,
+    name        TEXT NOT NULL,                 -- 'B8'
+    bj_von      INTEGER,
+    bj_bis      INTEGER,                       -- NULL = noch aktuell
+    quelle_url  TEXT NOT NULL,
+    deprecated  INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (baureihe_id) REFERENCES katalog_baureihe(id)
+);
+
+-- Was der Nutzer als „Motor" sieht: der HANDELSNAME, nicht der Code.
+-- Die Felder spiegeln 1:1 das Fahrzeugprofil → verlustfreie Vorbelegung.
+CREATE TABLE IF NOT EXISTS katalog_motorisierung (
+    id                 TEXT PRIMARY KEY,       -- 'audi-a4-b8-1-8-tfsi-160'
+    generation_id      TEXT NOT NULL,
+    anzeigename        TEXT NOT NULL,          -- '1.8 TFSI (160 PS)'
+    bj_von             INTEGER,
+    bj_bis             INTEGER,
+    kraftstoff         TEXT NOT NULL,          -- Vokabular aus modules.models
+    motorbauform       TEXT,
+    aufladung          TEXT,
+    direkteinspritzung INTEGER,                -- 1/0/NULL
+    partikelfilter     TEXT,                   -- keiner|dpf|opf
+    hubraum_ccm        INTEGER,
+    leistung_ps        INTEGER,
+    getriebe           TEXT,                   -- oft variantenabhängig → NULL ok
+    oel_viskositaet    TEXT,
+    oel_freigabe       TEXT,
+    -- Quellenpflicht (CI-Gate lehnt Zeilen ohne diese Felder ab)
+    quelle_url         TEXT NOT NULL,
+    quelle_zitat       TEXT NOT NULL,          -- Rohsatz der Quelle, wörtlich
+    quelle_abruf       TEXT NOT NULL,
+    deprecated         INTEGER NOT NULL DEFAULT 0,
+    FOREIGN KEY (generation_id) REFERENCES katalog_generation(id)
+);
+
+-- Motorcodes: NUR als Vorschlagsliste zum Bestätigen (siehe Vertrauensmodell).
+CREATE TABLE IF NOT EXISTS katalog_motorcode (
+    id           TEXT PRIMARY KEY,             -- 'vag-cdhb'
+    code         TEXT NOT NULL,                -- 'CDHB'
+    motorfamilie TEXT,                         -- 'EA888-GEN2' ← Empfehlungs-Anker
+    einbaulage   TEXT,                         -- laengs|quer ← hier passieren die Fehler
+    bj_von       INTEGER,
+    bj_bis       INTEGER,
+    quelle_url   TEXT NOT NULL,
+    quelle_zitat TEXT NOT NULL,
+    deprecated   INTEGER NOT NULL DEFAULT 0
+);
+
+-- BEWUSST n:m — eine Motorisierung kann mehrere Codes haben. Die App löst das
+-- NIE selbst auf, sondern legt die Auswahl dem Nutzer vor.
+CREATE TABLE IF NOT EXISTS katalog_motorisierung_motorcode (
+    motorisierung_id TEXT NOT NULL,
+    motorcode_id     TEXT NOT NULL,
+    PRIMARY KEY (motorisierung_id, motorcode_id),
+    FOREIGN KEY (motorisierung_id) REFERENCES katalog_motorisierung(id),
+    FOREIGN KEY (motorcode_id) REFERENCES katalog_motorcode(id)
+);
+
+-- HSN/TSN → Hersteller + Handelsname, komplett aus dem KBA-Bestand FZ 6.
+-- Quelle: Kraftfahrt-Bundesamt, FZ 6; Datenlizenz Deutschland Namensnennung 2.0
+-- (steht wörtlich im Impressum der Original-XLSX). Erlaubt zwei Zahlen aus dem
+-- Fahrzeugschein (Feld 2.1/2.2) statt einer Dropdown-Kaskade.
+CREATE TABLE IF NOT EXISTS katalog_kba (
+    hsn         TEXT NOT NULL,
+    tsn         TEXT NOT NULL,
+    hersteller  TEXT NOT NULL,
+    handelsname TEXT NOT NULL,
+    PRIMARY KEY (hsn, tsn)
+);
+
 -- --- Key/value settings inside the DB ---------------------------------------------
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
@@ -223,3 +336,8 @@ CREATE INDEX IF NOT EXISTS idx_appt_vehicle ON appointments(vehicle_id, erledigt
 CREATE INDEX IF NOT EXISTS idx_rules_vehicle ON care_rules(vehicle_id, aktiv);
 CREATE INDEX IF NOT EXISTS idx_logbook_vehicle_date ON logbook_entries(vehicle_id, date);
 CREATE INDEX IF NOT EXISTS idx_attach_entry ON attachments(entry_kind, entry_id);
+-- Katalog: Kaskade (Marke→Baureihe→Generation→Motorisierung) + HSN/TSN-Suche.
+CREATE INDEX IF NOT EXISTS idx_kat_baureihe_marke ON katalog_baureihe(marke_id);
+CREATE INDEX IF NOT EXISTS idx_kat_gen_baureihe ON katalog_generation(baureihe_id);
+CREATE INDEX IF NOT EXISTS idx_kat_mot_gen ON katalog_motorisierung(generation_id);
+CREATE INDEX IF NOT EXISTS idx_kat_kba_name ON katalog_kba(handelsname);

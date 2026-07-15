@@ -20,6 +20,7 @@ from PyQt6.QtWidgets import (
 )
 
 from modules import catalog as catalog_mod
+from modules import vehicle_catalog
 from modules.fuel import current_km
 from modules.models import CareRule
 from ui.dialogs import CatalogItemDialog
@@ -84,7 +85,15 @@ class EmpfehlungenView(BaseView):
         adopted = {i.id for i in items
                    if self.ctx.rules.has_catalog_rule(vehicle.id, i.id)}
         km_now = current_km(self.ctx.km_history(vehicle))
-        suggestions = catalog_mod.suggestions_for(items, vehicle, hidden, adopted, km_now)
+        # Motorfamilie nur aus einem BESTÄTIGTEN Motorcode und nur bei
+        # eindeutiger Auflösung (siehe modules.vehicle_catalog) — sonst None,
+        # und motorcode-abhängige Empfehlungen bleiben still.
+        motorfamilie = None
+        if vehicle.motorcode_herkunft == "nutzer" and vehicle.motorcode:
+            motorfamilie = vehicle_catalog.motorfamilie_fuer_code(
+                self.ctx.db, vehicle.motorcode)
+        suggestions = catalog_mod.suggestions_for(
+            items, vehicle, hidden, adopted, km_now, motorfamilie=motorfamilie)
 
         if not suggestions and not self._show_hidden:
             empty = QLabel(

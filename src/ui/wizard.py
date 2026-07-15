@@ -48,10 +48,16 @@ def _page_header(title: str, subtitle: str) -> QWidget:
 
 
 class _VehiclePage(QWizardPage):
-    """Collects a list of vehicles via the add dialog."""
+    """Collects a list of vehicles via the add dialog.
 
-    def __init__(self, parent=None) -> None:
+    ``db`` wird durchgereicht, damit schon der erste Anlege-Dialog den
+    Fahrzeug-Katalog anbieten kann (HSN/TSN bzw. Marke → Motor) — gerade beim
+    Erststart erspart das die meiste Tipparbeit.
+    """
+
+    def __init__(self, parent=None, db=None) -> None:
         super().__init__(parent)
+        self._db = db
         self.items: list = []
 
         layout = QVBoxLayout(self)
@@ -79,7 +85,7 @@ class _VehiclePage(QWizardPage):
         return len(self.items) > 0
 
     def _add(self) -> None:
-        dlg = VehicleDialog(parent=self)
+        dlg = VehicleDialog(parent=self, db=self._db)
         if dlg.exec():
             self.items.append(dlg.result_model)
             self._refresh()
@@ -100,7 +106,7 @@ class _VehiclePage(QWizardPage):
 
 
 class FirstRunWizard(QWizard):
-    def __init__(self, parent=None) -> None:
+    def __init__(self, parent=None, db=None) -> None:
         super().__init__(parent)
         self.setWindowTitle("Willkommen")
         # ClassicStyle: zeichnet keinen Style-Header (siehe _page_header) —
@@ -113,7 +119,7 @@ class FirstRunWizard(QWizard):
         self.setButtonText(QWizard.WizardButton.CancelButton, "Abbrechen")
 
         self.addPage(self._intro())
-        self.vehicle_page = _VehiclePage()
+        self.vehicle_page = _VehiclePage(db=db)
         self.addPage(self.vehicle_page)
 
     def _intro(self) -> QWizardPage:
@@ -153,7 +159,7 @@ class FirstRunWizard(QWizard):
 
 def run_wizard(ctx, parent=None) -> bool:
     """Show the wizard and commit on finish. Returns True if completed."""
-    wizard = FirstRunWizard(parent)
+    wizard = FirstRunWizard(parent, db=ctx.db)
     if wizard.exec():
         wizard.commit(ctx)
         return True
